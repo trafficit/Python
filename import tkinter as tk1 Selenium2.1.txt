@@ -1,0 +1,77 @@
+import tkinter as tk
+from tkinter import messagebox
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
+
+def login(driver, username, password):
+    driver.get("https://www.tiktok.com/login")
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, "username"))).send_keys(username)
+    driver.find_element(By.NAME, "password").send_keys(password)
+    driver.find_element(By.XPATH, "//button[contains(text(), 'Login')]").click()
+
+def get_followers(driver, username):
+    driver.get(f"https://www.tiktok.com/@{username}/followers")
+    followers = WebDriverWait(driver, 10).until(
+        EC.presence_of_all_elements_located((By.CLASS_NAME, "css-k0d282-SpanNickname es616eb6"))
+    )
+    return [f.text for f in followers]
+
+def is_following_back(driver, follower, username):
+    driver.get(f"https://www.tiktok.com/@{follower}/following")
+    following = WebDriverWait(driver, 10).until(
+        EC.presence_of_all_elements_located((By.CLASS_NAME, "css-k0d282-SpanNickname es616eb6"))
+    )
+    return username in [f.text for f in following]
+
+def remove_follower(driver, username, follower):
+    driver.get(f"https://www.tiktok.com/@{username}/followers")
+    follower_element = WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.XPATH, f"//span[text()='{follower}']"))
+    )
+    follower_element.find_element(By.XPATH, "../..//button[contains(text(), 'Remove')]").click()
+
+def on_remove_click():
+    username = entry_username.get()
+    password = entry_password.get()
+    
+    driver = webdriver.Chrome(ChromeDriverManager().install())
+    
+    try:
+        login(driver, username, password)
+        followers = get_followers(driver, username)
+        
+        removed_followers = []
+        for follower in followers:
+            if not is_following_back(driver, follower, username):
+                remove_follower(driver, username, follower)
+                removed_followers.append(follower)
+        
+        if removed_followers:
+            messagebox.showinfo("Success", f"Removed followers: {', '.join(removed_followers)}")
+        else:
+            messagebox.showinfo("Info", "No followers to remove")
+    finally:
+        driver.quit()
+
+app = tk.Tk()
+app.title("TikTok Follower Cleaner")
+
+label_username = tk.Label(app, text="Enter your TikTok username:")
+label_username.pack()
+
+entry_username = tk.Entry(app)
+entry_username.pack()
+
+label_password = tk.Label(app, text="Enter your TikTok password:")
+label_password.pack()
+
+entry_password = tk.Entry(app, show="*")
+entry_password.pack()
+
+button_remove = tk.Button(app, text="Remove Non-following Followers", command=on_remove_click)
+button_remove.pack()
+
+app.mainloop()
